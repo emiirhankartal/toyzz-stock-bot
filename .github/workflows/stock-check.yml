@@ -31,5 +31,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          PRODUCT_URL: "https://www.toyzzshop.com/fifa-world-cup-2026-cikartma-albumu?serial=104378"
+          PRODUCT_URLS: |
+            https://www.toyzzshop.com/fifa-world-cup-2026-cikartma-albumu?serial=104378
+            https://www.toyzzshop.com/fifa-world-cup-2026-cikartma-paketi?serial=104377
         run: python stock_check.py
