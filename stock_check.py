@@ -6,7 +6,7 @@ from playwright.async_api import async_playwright
 
 PRODUCT_URL = os.getenv(
     "PRODUCT_URL",
-    "https://www.toyzzshop.com/fifa-world-cup-2026-adrenalyn-xl-trading-card-8li-paket?serial=102828"
+    "https://www.toyzzshop.com/fifa-world-cup-2026-cikartma-albumu?serial=104378"
 )
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
