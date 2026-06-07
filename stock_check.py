@@ -15,22 +15,29 @@ PRODUCT_URLS = [
 ]
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_CHAT_IDS = [
+    chat_id.strip()
+    for chat_id in os.getenv("TELEGRAM_CHAT_IDS", "").split(",")
+    if chat_id.strip()
+]
 
 
 def send_telegram_message(message):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        raise Exception("Telegram token veya chat id eksik.")
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_IDS:
+        raise Exception("Telegram token veya chat id listesi eksik.")
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
-    data = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message
-    }
+    for chat_id in TELEGRAM_CHAT_IDS:
+        data = {
+            "chat_id": chat_id,
+            "text": message
+        }
 
-    response = requests.post(url, data=data, timeout=20)
-    response.raise_for_status()
+        response = requests.post(url, data=data, timeout=20)
+        response.raise_for_status()
+
+        print(f"Telegram bildirimi gönderildi: {chat_id}")
 
 
 async def check_stock(product_url):
