@@ -33,5 +33,5 @@ jobs:
           TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
           PRODUCT_URLS: |
             https://www.toyzzshop.com/fifa-world-cup-2026-cikartma-albumu?serial=104378
-            https://www.toyzzshop.com/2025-26-euroleague-cikartma-albumu?serial=103132
+            https://www.toyzzshop.com/fifa-world-cup-2026-cikartma-paketi?serial=104377
         run: python stock_check.py
