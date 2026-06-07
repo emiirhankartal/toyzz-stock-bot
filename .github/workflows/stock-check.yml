@@ -2,7 +2,7 @@ name: Stock Check
 
 on:
   schedule:
-    - cron: "17,25,47 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 env:
