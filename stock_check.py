@@ -4,10 +4,15 @@ import requests
 from playwright.async_api import async_playwright
 
 
-PRODUCT_URL = os.getenv(
-    "PRODUCT_URL",
-    "https://www.toyzzshop.com/fifa-world-cup-2026-cikartma-albumu?serial=104378"
-)
+DEFAULT_PRODUCT_URLS = """
+https://www.toyzzshop.com/fifa-world-cup-2026-cikartma-albumu?serial=104378
+"""
+
+PRODUCT_URLS = [
+    url.strip()
+    for url in os.getenv("PRODUCT_URLS", DEFAULT_PRODUCT_URLS).splitlines()
+    if url.strip()
+]
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -28,7 +33,7 @@ def send_telegram_message(message):
     response.raise_for_status()
 
 
-async def check_stock():
+async def check_stock(product_url):
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
@@ -49,9 +54,7 @@ async def check_stock():
         )
 
         try:
-            await page.goto(PRODUCT_URL, wait_until="domcontentloaded", timeout=60000)
-
-            # Toyzz sayfası JavaScript ile yüklendiği için bekliyoruz.
+            await page.goto(product_url, wait_until="domcontentloaded", timeout=60000)
             await page.wait_for_timeout(10000)
 
             body_text = await page.locator("body").inner_text()
@@ -101,25 +104,28 @@ async def check_stock():
 
 
 async def main():
-    print("Ürün kontrol ediliyor...")
-    print("URL:", PRODUCT_URL)
+    print("Kontrol edilecek ürün sayısı:", len(PRODUCT_URLS))
 
-    status = await check_stock()
-    print("Durum:", status)
+    for product_url in PRODUCT_URLS:
+        print("--------------------------------")
+        print("Ürün kontrol ediliyor:")
+        print(product_url)
 
-    if status == "out_of_stock":
-        print("Stok yok. Bildirim gönderilmedi.")
+        status = await check_stock(product_url)
+        print("Durum:", status)
 
-    elif status == "in_stock":
-        send_telegram_message(
-            "🔥 STOK GELMİŞ OLABİLİR!\n\n"
-            "Toyzz Shop - FIFA World Cup 2026 Çıkartma Albümü\n"
-            f"{PRODUCT_URL}"
-        )
-        print("Telegram bildirimi gönderildi.")
+        if status == "out_of_stock":
+            print("Stok yok. Bildirim gönderilmedi.")
 
-    else:
-        print("Stok durumu anlaşılamadı. Yanlış alarm vermemek için bildirim gönderilmedi.")
+        elif status == "in_stock":
+            send_telegram_message(
+                "🔥 STOK GELMİŞ OLABİLİR!\n\n"
+                f"{product_url}"
+            )
+            print("Telegram bildirimi gönderildi.")
+
+        else:
+            print("Stok durumu anlaşılamadı. Bildirim gönderilmedi.")
 
 
 if __name__ == "__main__":
