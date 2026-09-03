@@ -4,15 +4,7 @@ import requests
 from playwright.async_api import async_playwright
 
 
-DEFAULT_PRODUCT_URLS = """
-https://www.toyzzshop.com/fifa-world-cup-2026-cikartma-albumu?serial=104378
-"""
-
-PRODUCT_URLS = [
-    url.strip()
-    for url in os.getenv("PRODUCT_URLS", DEFAULT_PRODUCT_URLS).splitlines()
-    if url.strip()
-]
+ISMEK_URL = "https://ismek.istanbul/portal/egitim_detay.aspx?BransCode=5909"
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_IDS = [
@@ -40,7 +32,7 @@ def send_telegram_message(message):
         print(f"Telegram bildirimi gönderildi: {chat_id}")
 
 
-async def check_stock(product_url):
+async def check_salsa():
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
@@ -61,78 +53,64 @@ async def check_stock(product_url):
         )
 
         try:
-            await page.goto(product_url, wait_until="domcontentloaded", timeout=60000)
+            await page.goto(
+                ISMEK_URL,
+                wait_until="domcontentloaded",
+                timeout=60000
+            )
+
             await page.wait_for_timeout(10000)
 
             body_text = await page.locator("body").inner_text()
+
             print("Sayfa yazı uzunluğu:", len(body_text))
 
             if len(body_text.strip()) < 100:
                 print("Sayfa düzgün okunamadı.")
                 return "unknown"
 
-            matched_buttons = await page.locator("button").evaluate_all("""
-                buttons => {
-                    function getButtonText(button) {
-                        return [
-                            button.innerText,
-                            button.textContent,
-                            button.getAttribute("aria-label"),
-                            button.getAttribute("title"),
-                            button.getAttribute("name")
-                        ].join(" ").toLocaleLowerCase("tr-TR");
-                    }
+            if "Bu programda şu anda başvuru alınmamaktadır" in body_text:
+                return "closed"
 
-                    return buttons
-                        .filter(button => {
-                            const text = getButtonText(button);
-                            return text.includes("tükendi") && text.includes("haber ver");
-                        })
-                        .map(button => {
-                            return {
-                                text: button.innerText || button.textContent || button.getAttribute("aria-label") || "",
-                                disabled: button.disabled,
-                                className: button.className
-                            };
-                        });
-                }
-            """)
+            apply_buttons = page.get_by_text(
+                "Hemen Başvur",
+                exact=True
+            )
 
-            print("Tükendi/Haber Ver butonu sayısı:", len(matched_buttons))
+            button_count = await apply_buttons.count()
 
-            if len(matched_buttons) > 0:
-                print("Bulunan buton:", matched_buttons[0]["text"])
-                return "out_of_stock"
+            print("Hemen Başvur butonu sayısı:", button_count)
 
-            return "in_stock"
+            if button_count > 0:
+                return "open"
+
+            return "unknown"
 
         finally:
             await browser.close()
 
 
 async def main():
-    print("Kontrol edilecek ürün sayısı:", len(PRODUCT_URLS))
+    print("İSMEK Salsa 1. Seviye kontrol ediliyor...")
 
-    for product_url in PRODUCT_URLS:
-        print("--------------------------------")
-        print("Ürün kontrol ediliyor:")
-        print(product_url)
+    status = await check_salsa()
 
-        status = await check_stock(product_url)
-        print("Durum:", status)
+    print("Durum:", status)
 
-        if status == "out_of_stock":
-            print("Stok yok. Bildirim gönderilmedi.")
+    if status == "closed":
+        print("Başvuru kapalı. Bildirim gönderilmedi.")
 
-        elif status == "in_stock":
-            send_telegram_message(
-                "🔥 STOK GELMİŞ OLABİLİR!\n\n"
-                f"{product_url}"
-            )
-            print("Telegram bildirimi gönderildi.")
+    elif status == "open":
+        send_telegram_message(
+            "💃 İSMEK SALSA 1. SEVİYE AÇILDI!\n\n"
+            "Başvuru alınmaya başlanmış olabilir.\n\n"
+            f"{ISMEK_URL}"
+        )
 
-        else:
-            print("Stok durumu anlaşılamadı. Bildirim gönderilmedi.")
+        print("Telegram bildirimi gönderildi.")
+
+    else:
+        print("Durum anlaşılamadı. Bildirim gönderilmedi.")
 
 
 if __name__ == "__main__":
