@@ -1,8 +1,6 @@
 name: ISMEK Salsa Check
 
 on:
-  schedule:
-    - cron: "17,47 * * * *"
   workflow_dispatch:
 
 env:
