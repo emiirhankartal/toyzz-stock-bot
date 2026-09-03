@@ -26,7 +26,12 @@ def send_telegram_message(message):
             "text": message
         }
 
-        response = requests.post(url, data=data, timeout=20)
+        response = requests.post(
+            url,
+            data=data,
+            timeout=20
+        )
+
         response.raise_for_status()
 
         print(f"Telegram bildirimi gönderildi: {chat_id}")
@@ -34,6 +39,7 @@ def send_telegram_message(message):
 
 async def check_course():
     async with async_playwright() as p:
+
         browser = await p.chromium.launch(
             headless=True,
             args=[
@@ -61,98 +67,87 @@ async def check_course():
                 timeout=120000
             )
 
-            print("Sayfaya bağlantı kuruldu, içerik bekleniyor...")
+            print("Sayfaya bağlantı kuruldu.")
 
+            # Site yavaş olduğu için biraz bekle
             await page.wait_for_timeout(15000)
 
             body_text = await page.locator("body").inner_text(
                 timeout=30000
             )
 
-            print("Body uzunluğu:", len(body_text))
+            print("İlk body uzunluğu:", len(body_text))
 
             if len(body_text.strip()) < 100:
-                print("Sayfa içeriği yeterli gelmedi.")
+                print("Sayfa düzgün yüklenmedi.")
                 return "unknown"
 
-            centers = page.get_by_text(
-                "Eğitimin Verildiği Tüm Merkezler",
-                exact=True
+            # Gerçek tab ID'si
+            centers_tab = page.locator("#merkezler-tab")
+
+            tab_count = await centers_tab.count()
+
+            print("merkezler-tab sayısı:", tab_count)
+
+            if tab_count == 0:
+                print("#merkezler-tab bulunamadı.")
+                return "unknown"
+
+            print("#merkezler-tab bulundu.")
+
+            # Playwright görünürlük kontrolüne takılmasın diye
+            # doğrudan DOM üzerinden click çalıştırıyoruz
+            await centers_tab.evaluate(
+                "el => el.click()"
             )
 
-            count = await centers.count()
+            print("Merkezler sekmesine JS click gönderildi.")
 
-            print("Merkezler sekmesi sayısı:", count)
-
-            if count == 0:
-                print("Merkezler sekmesi bulunamadı.")
-                print("İlk 5000 karakter:")
-                print(body_text[:5000])
-                return "unknown"
-
-            clicked = False
-
-            for i in range(count):
-                try:
-                    visible = await centers.nth(i).is_visible()
-
-                    print(
-                        f"Merkezler elemanı {i} görünür mü:",
-                        visible
-                    )
-
-                    if visible:
-                        print(
-                            "Eğitimin Verildiği Tüm Merkezler "
-                            "sekmesine tıklanıyor..."
-                        )
-
-                        await centers.nth(i).click(
-                            force=True,
-                            timeout=30000
-                        )
-
-                        clicked = True
-                        break
-
-                except Exception as e:
-                    print(
-                        f"Merkez elemanı {i} kontrol hatası:",
-                        repr(e)
-                    )
-
-            if not clicked:
-                print("Görünür merkez sekmesine tıklanamadı.")
-                return "unknown"
-
-            print("Sekmeye tıklandı, merkezler bekleniyor...")
-
+            # Tıklama sonrası dinamik veriyi bekle
             await page.wait_for_timeout(10000)
 
             body_text = await page.locator("body").inner_text(
                 timeout=30000
             )
 
-            print("Tıklama sonrası body uzunluğu:", len(body_text))
+            print(
+                "Tıklama sonrası body uzunluğu:",
+                len(body_text)
+            )
+
+            apply_count = body_text.count("Hemen Başvur")
 
             closed_text = (
                 "Bu programda şu anda başvuru alınmamaktadır"
             )
 
             closed_found = closed_text in body_text
-            apply_count = body_text.count("Hemen Başvur")
 
-            print("Başvuru kapalı yazısı var mı:", closed_found)
-            print("Hemen Başvur sayısı:", apply_count)
+            print(
+                "Hemen Başvur sayısı:",
+                apply_count
+            )
+
+            print(
+                "Başvuru alınmamaktadır yazısı var mı:",
+                closed_found
+            )
+
+            # Öncelik açık başvuruda.
+            # Sayfanın başka bir yerinde kapalı mesajı kalmış olsa bile
+            # Hemen Başvur varsa bildirim gönder.
+            if apply_count > 0:
+                return "open"
 
             if closed_found:
                 return "closed"
 
-            if apply_count > 0:
-                return "open"
+            print("Durum belirlenemedi.")
 
-            print("Ne açık ne kapalı durumu tespit edilebildi.")
-            print("Tıklama sonrası ilk 10000 karakter:")
+            print(
+                "Tıklama sonrası ilk 10000 karakter:"
+            )
+
             print(body_text[:10000])
 
             return "unknown"
@@ -168,6 +163,7 @@ async def check_course():
 
 
 async def main():
+
     print("İSMEK kursu kontrol ediliyor...")
     print(ISMEK_URL)
 
@@ -176,22 +172,26 @@ async def main():
     print("Durum:", status)
 
     if status == "closed":
+
         print(
             "Başvuru kapalı. "
             "Telegram bildirimi gönderilmedi."
         )
 
     elif status == "open":
+
         send_telegram_message(
             "🚨 İSMEK KURS BAŞVURUSU AÇIK!\n\n"
-            "Planlanan merkezlerde aktif "
-            "Hemen Başvur seçeneği bulundu.\n\n"
+            "Aktif bir 'Hemen Başvur' seçeneği bulundu.\n\n"
             f"{ISMEK_URL}"
         )
 
-        print("Telegram bildirimi gönderildi.")
+        print(
+            "Telegram bildirimi gönderildi."
+        )
 
     else:
+
         print(
             "Durum anlaşılamadı. "
             "Telegram bildirimi gönderilmedi."
