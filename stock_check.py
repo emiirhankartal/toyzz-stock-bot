@@ -63,25 +63,33 @@ async def check_salsa():
 
             body_text = await page.locator("body").inner_text()
 
-            print("Sayfa yazı uzunluğu:", len(body_text))
-
             if len(body_text.strip()) < 100:
                 print("Sayfa düzgün okunamadı.")
                 return "unknown"
 
-            if "Bu programda şu anda başvuru alınmamaktadır" in body_text:
+            start_text = "Planlanan Merkezler"
+            end_text = "Eğitimin Verildiği Tüm Merkezler"
+
+            if start_text not in body_text:
+                print("Planlanan Merkezler bölümü bulunamadı.")
+                return "unknown"
+
+            planned_section = body_text.split(start_text, 1)[1]
+
+            if end_text in planned_section:
+                planned_section = planned_section.split(end_text, 1)[0]
+
+            planned_section = planned_section.strip()
+
+            print("PLANLANAN MERKEZLER BÖLÜMÜ:")
+            print(planned_section)
+
+            closed_text = "Bu programda şu anda başvuru alınmamaktadır."
+
+            if closed_text in planned_section:
                 return "closed"
 
-            apply_buttons = page.get_by_text(
-                "Hemen Başvur",
-                exact=True
-            )
-
-            button_count = await apply_buttons.count()
-
-            print("Hemen Başvur butonu sayısı:", button_count)
-
-            if button_count > 0:
+            if "Hemen Başvur" in planned_section:
                 return "open"
 
             return "unknown"
@@ -102,8 +110,8 @@ async def main():
 
     elif status == "open":
         send_telegram_message(
-            "💃 İSMEK SALSA 1. SEVİYE AÇILDI!\n\n"
-            "Başvuru alınmaya başlanmış olabilir.\n\n"
+            "🚨 İSMEK SALSA 1. SEVİYE AÇILDI!\n\n"
+            "Planlanan Merkezler bölümünde Hemen Başvur butonu göründü.\n\n"
             f"{ISMEK_URL}"
         )
 
