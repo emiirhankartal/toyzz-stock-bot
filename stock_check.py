@@ -4,7 +4,7 @@ import requests
 from playwright.async_api import async_playwright
 
 
-ISMEK_URL = "https://ismek.istanbul/portal/egitim_detay.aspx?BransCode=5909"
+ISMEK_URL = "https://ismek.istanbul/portal/egitim_detay.aspx?BransCode=5907"
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_IDS = [
