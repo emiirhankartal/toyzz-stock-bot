@@ -26,15 +26,20 @@ def send_telegram_message(message):
             "text": message
         }
 
-        response = requests.post(
-            url,
-            data=data,
-            timeout=20
-        )
+        try:
+            response = requests.post(
+                url,
+                data=data,
+                timeout=20
+            )
 
-        response.raise_for_status()
+            response.raise_for_status()
 
-        print(f"Telegram bildirimi gönderildi: {chat_id}")
+            print(f"Telegram bildirimi gönderildi: {chat_id}")
+
+        except requests.RequestException as e:
+            print(f"Telegram bildirimi gönderilemedi: {chat_id}")
+            print("Hata:", e)
 
 
 async def check_course():
@@ -69,7 +74,7 @@ async def check_course():
 
             print("Sayfaya bağlantı kuruldu.")
 
-            # Site yavaş olduğu için biraz bekle
+            # İSMEK sitesi yavaş olduğu için biraz bekle
             await page.wait_for_timeout(15000)
 
             body_text = await page.locator("body").inner_text(
@@ -82,7 +87,7 @@ async def check_course():
                 print("Sayfa düzgün yüklenmedi.")
                 return "unknown"
 
-            # Gerçek tab ID'si
+            # "Eğitimin Verildiği Tüm Merkezler" sekmesinin gerçek ID'si
             centers_tab = page.locator("#merkezler-tab")
 
             tab_count = await centers_tab.count()
@@ -95,15 +100,14 @@ async def check_course():
 
             print("#merkezler-tab bulundu.")
 
-            # Playwright görünürlük kontrolüne takılmasın diye
-            # doğrudan DOM üzerinden click çalıştırıyoruz
+            # Görünürlük kontrolüne takılmadan direkt JS click
             await centers_tab.evaluate(
                 "el => el.click()"
             )
 
             print("Merkezler sekmesine JS click gönderildi.")
 
-            # Tıklama sonrası dinamik veriyi bekle
+            # Merkezlerin dinamik olarak yüklenmesini bekle
             await page.wait_for_timeout(10000)
 
             body_text = await page.locator("body").inner_text(
@@ -123,32 +127,26 @@ async def check_course():
 
             closed_found = closed_text in body_text
 
-            print(
-                "Hemen Başvur sayısı:",
-                apply_count
-            )
-
+            print("Hemen Başvur sayısı:", apply_count)
             print(
                 "Başvuru alınmamaktadır yazısı var mı:",
                 closed_found
             )
 
-            # Öncelik açık başvuruda.
-            # Sayfanın başka bir yerinde kapalı mesajı kalmış olsa bile
-            # Hemen Başvur varsa bildirim gönder.
-            if apply_count > 0:
+            # Sayfanın genelinde zaten 1 adet sabit
+            # "Hemen Başvur" bulunabiliyor.
+            #
+            # 2 veya daha fazlaysa merkezlerden en az
+            # birinde gerçek başvuru açılmış kabul ediyoruz.
+            if apply_count > 1:
                 return "open"
 
             if closed_found:
                 return "closed"
 
+            # 1 adet genel buton var ama kapalı mesajı da
+            # görünmüyorsa emin olamadığımız için bildirim atma.
             print("Durum belirlenemedi.")
-
-            print(
-                "Tıklama sonrası ilk 10000 karakter:"
-            )
-
-            print(body_text[:10000])
 
             return "unknown"
 
@@ -164,7 +162,7 @@ async def check_course():
 
 async def main():
 
-    print("İSMEK kursu kontrol ediliyor...")
+    print("İSMEK Salsa 1. Seviye kontrol ediliyor...")
     print(ISMEK_URL)
 
     status = await check_course()
@@ -181,14 +179,12 @@ async def main():
     elif status == "open":
 
         send_telegram_message(
-            "🚨 İSMEK KURS BAŞVURUSU AÇIK!\n\n"
-            "Aktif bir 'Hemen Başvur' seçeneği bulundu.\n\n"
+            "🚨 İSMEK SALSA 1. SEVİYE AÇILDI!\n\n"
+            "Yeni bir merkezde başvuru seçeneği tespit edildi.\n\n"
             f"{ISMEK_URL}"
         )
 
-        print(
-            "Telegram bildirimi gönderildi."
-        )
+        print("Telegram bildirimi gönderildi.")
 
     else:
 
