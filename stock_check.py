@@ -32,7 +32,7 @@ def send_telegram_message(message):
         print(f"Telegram bildirimi gönderildi: {chat_id}")
 
 
-async def check_salsa():
+async def check_course():
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
@@ -53,86 +53,149 @@ async def check_salsa():
         )
 
         try:
+            print("Sayfa açılıyor...")
+
             await page.goto(
                 ISMEK_URL,
-                wait_until="domcontentloaded",
-                timeout=60000
+                wait_until="commit",
+                timeout=120000
             )
 
-            await page.wait_for_timeout(5000)
+            print("Sayfaya bağlantı kuruldu, içerik bekleniyor...")
 
-            # Önce "Eğitimin Verildiği Tüm Merkezler" kısmına tıkla
-            centers_button = page.get_by_text(
+            await page.wait_for_timeout(15000)
+
+            body_text = await page.locator("body").inner_text(
+                timeout=30000
+            )
+
+            print("Body uzunluğu:", len(body_text))
+
+            if len(body_text.strip()) < 100:
+                print("Sayfa içeriği yeterli gelmedi.")
+                return "unknown"
+
+            centers = page.get_by_text(
                 "Eğitimin Verildiği Tüm Merkezler",
                 exact=True
             )
 
-            if await centers_button.count() == 0:
-                print("Eğitimin Verildiği Tüm Merkezler butonu bulunamadı.")
+            count = await centers.count()
+
+            print("Merkezler sekmesi sayısı:", count)
+
+            if count == 0:
+                print("Merkezler sekmesi bulunamadı.")
+                print("İlk 5000 karakter:")
+                print(body_text[:5000])
                 return "unknown"
 
-            print("Merkezler sekmesi bulundu, tıklanıyor...")
+            clicked = False
 
-            await centers_button.first.click()
+            for i in range(count):
+                try:
+                    visible = await centers.nth(i).is_visible()
 
-            # Dinamik içeriğin yüklenmesini bekle
-            await page.wait_for_timeout(5000)
+                    print(
+                        f"Merkezler elemanı {i} görünür mü:",
+                        visible
+                    )
 
-            body_text = await page.locator("body").inner_text()
+                    if visible:
+                        print(
+                            "Eğitimin Verildiği Tüm Merkezler "
+                            "sekmesine tıklanıyor..."
+                        )
 
-            print("Tıklama sonrası sayfa içeriği:")
-            print(body_text)
+                        await centers.nth(i).click(
+                            force=True,
+                            timeout=30000
+                        )
 
-            closed_text = "Bu programda şu anda başvuru alınmamaktadır"
+                        clicked = True
+                        break
 
-            # Kapalıysa direkt çık
-            if closed_text in body_text:
-                print("Başvuru alınmıyor.")
-                return "closed"
+                except Exception as e:
+                    print(
+                        f"Merkez elemanı {i} kontrol hatası:",
+                        repr(e)
+                    )
 
-            # Tıklama sonrası açılan bölümde Hemen Başvur ara
-            apply_buttons = page.get_by_text(
-                "Hemen Başvur",
-                exact=True
+            if not clicked:
+                print("Görünür merkez sekmesine tıklanamadı.")
+                return "unknown"
+
+            print("Sekmeye tıklandı, merkezler bekleniyor...")
+
+            await page.wait_for_timeout(10000)
+
+            body_text = await page.locator("body").inner_text(
+                timeout=30000
             )
 
-            button_count = await apply_buttons.count()
+            print("Tıklama sonrası body uzunluğu:", len(body_text))
 
-            print("Hemen Başvur butonu sayısı:", button_count)
+            closed_text = (
+                "Bu programda şu anda başvuru alınmamaktadır"
+            )
 
-            if button_count > 0:
+            closed_found = closed_text in body_text
+            apply_count = body_text.count("Hemen Başvur")
+
+            print("Başvuru kapalı yazısı var mı:", closed_found)
+            print("Hemen Başvur sayısı:", apply_count)
+
+            if closed_found:
+                return "closed"
+
+            if apply_count > 0:
                 return "open"
+
+            print("Ne açık ne kapalı durumu tespit edilebildi.")
+            print("Tıklama sonrası ilk 10000 karakter:")
+            print(body_text[:10000])
 
             return "unknown"
 
         except Exception as e:
-            print("Hata oluştu:", e)
+            print("HATA:")
+            print(repr(e))
+
             return "unknown"
 
         finally:
             await browser.close()
 
-async def main():
-    print("İSMEK Salsa 1. Seviye kontrol ediliyor...")
 
-    status = await check_salsa()
+async def main():
+    print("İSMEK kursu kontrol ediliyor...")
+    print(ISMEK_URL)
+
+    status = await check_course()
 
     print("Durum:", status)
 
     if status == "closed":
-        print("Başvuru kapalı. Bildirim gönderilmedi.")
+        print(
+            "Başvuru kapalı. "
+            "Telegram bildirimi gönderilmedi."
+        )
 
     elif status == "open":
         send_telegram_message(
-            "🚨 İSMEK SALSA 1. SEVİYE AÇILDI!\n\n"
-            "Planlanan Merkezler bölümünde Hemen Başvur butonu göründü.\n\n"
+            "🚨 İSMEK KURS BAŞVURUSU AÇIK!\n\n"
+            "Planlanan merkezlerde aktif "
+            "Hemen Başvur seçeneği bulundu.\n\n"
             f"{ISMEK_URL}"
         )
 
         print("Telegram bildirimi gönderildi.")
 
     else:
-        print("Durum anlaşılamadı. Bildirim gönderilmedi.")
+        print(
+            "Durum anlaşılamadı. "
+            "Telegram bildirimi gönderilmedi."
+        )
 
 
 if __name__ == "__main__":
