@@ -59,44 +59,58 @@ async def check_salsa():
                 timeout=60000
             )
 
-            await page.wait_for_timeout(10000)
+            await page.wait_for_timeout(5000)
+
+            # Önce "Eğitimin Verildiği Tüm Merkezler" kısmına tıkla
+            centers_button = page.get_by_text(
+                "Eğitimin Verildiği Tüm Merkezler",
+                exact=True
+            )
+
+            if await centers_button.count() == 0:
+                print("Eğitimin Verildiği Tüm Merkezler butonu bulunamadı.")
+                return "unknown"
+
+            print("Merkezler sekmesi bulundu, tıklanıyor...")
+
+            await centers_button.first.click()
+
+            # Dinamik içeriğin yüklenmesini bekle
+            await page.wait_for_timeout(5000)
 
             body_text = await page.locator("body").inner_text()
 
-            if len(body_text.strip()) < 100:
-                print("Sayfa düzgün okunamadı.")
-                return "unknown"
+            print("Tıklama sonrası sayfa içeriği:")
+            print(body_text)
 
-            start_text = "Planlanan Merkezler"
-            end_text = "Eğitimin Verildiği Tüm Merkezler"
+            closed_text = "Bu programda şu anda başvuru alınmamaktadır"
 
-            if start_text not in body_text:
-                print("Planlanan Merkezler bölümü bulunamadı.")
-                return "unknown"
-
-            planned_section = body_text.split(start_text, 1)[1]
-
-            if end_text in planned_section:
-                planned_section = planned_section.split(end_text, 1)[0]
-
-            planned_section = planned_section.strip()
-
-            print("PLANLANAN MERKEZLER BÖLÜMÜ:")
-            print(planned_section)
-
-            closed_text = "Bu programda şu anda başvuru alınmamaktadır."
-
-            if closed_text in planned_section:
+            # Kapalıysa direkt çık
+            if closed_text in body_text:
+                print("Başvuru alınmıyor.")
                 return "closed"
 
-            if "Hemen Başvur" in planned_section:
+            # Tıklama sonrası açılan bölümde Hemen Başvur ara
+            apply_buttons = page.get_by_text(
+                "Hemen Başvur",
+                exact=True
+            )
+
+            button_count = await apply_buttons.count()
+
+            print("Hemen Başvur butonu sayısı:", button_count)
+
+            if button_count > 0:
                 return "open"
 
             return "unknown"
 
+        except Exception as e:
+            print("Hata oluştu:", e)
+            return "unknown"
+
         finally:
             await browser.close()
-
 
 async def main():
     print("İSMEK Salsa 1. Seviye kontrol ediliyor...")
